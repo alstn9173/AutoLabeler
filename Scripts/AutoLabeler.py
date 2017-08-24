@@ -16,9 +16,11 @@ import unittest
 
 import desired_capabilities
 from appium import webdriver
+from appium.webdriver.common.touch_action import TouchAction
 
 class AutoLabeler(unittest.TestCase):
     THRESHOLD = 0
+
     input_file_directory = os.getcwd() + '/data/'
     output_file_directory = os.getcwd() + '/result/'
 
@@ -31,7 +33,7 @@ class AutoLabeler(unittest.TestCase):
         result = self.labeling_from_tensorflow(image_path)
 
         stack = []
-        result = result
+        result = self.refine_result_data(result)
 
         image_number = num_of_image + 1
 
@@ -55,25 +57,48 @@ class AutoLabeler(unittest.TestCase):
 
     def labeling_from_tensorflow(self, image_path):
         # run tensorflow test method
-        return []
+        result = 0
+        return result   # return refined label data
 
     def refine_result_data(self, result):
-        something = 0
+
+
+        return result
 
     def do_action_use_appium(self, widget):
-        something = 0
+        if widget == 'BACK':
+            self.driver.press_keycode(4)    # go back
+        else:
+            el = self.driver.find_element_by_name(widget)
+            action = TouchAction(self.driver)
+            action.tap(el).perform()
 
     def save_label(self, filename, label):
-        something = 0
+        label_data = open(self.output_file_directory + filename, 'w')
+        label_data.write(label)
+        label_data.close()
 
-    def check_result(self, result, xml):
-        something = 0
+    def check_result(self, result):
+        xml = self.driver.page_source
+        widget_list = self.get_boundary_from_xml()
+
 
     def get_boundary_from_xml(self):
-        something = 0
+        xml = self.driver.page_source
 
-    def find_boundary_data(self):
-        something = 0
+        # Parsing Parsing Parsing Parsing Parsing
+        # Parsing Parsing Parsing Parsing Parsing
+        # Parsing Parsing Parsing Parsing Parsing
+        # Parsing Parsing Parsing Parsing Parsing
+        # Parsing Parsing Parsing Parsing Parsing
+        # Parsing Parsing Parsing Parsing Parsing
+
+        widget_list = []
+        return widget_list
+
+    def find_boundary_data(self, label, widget_list):
+        a = 1
+        # check start_x, start_y, width, height
 
 if __name__ == "__main__":
     suite = unittest.TestLoader().loadTestsFromTestCase(AutoLabeler)
