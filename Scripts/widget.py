@@ -1,27 +1,30 @@
+##############
+# COMPLETE!!!#
+##############
 class Widget :
-    widget_data = []
-    def __init__(self):
-        self.widget_data['index'] = 0
-        self.widget_data['class'] = 0
-        self.widget_data['package'] = 0
-        self.widget_data['content-desc'] = 0
-        self.widget_data['checkable'] = 0
-        self.widget_data['checked'] = 0
-        self.widget_data['clickable'] = 0
-        self.widget_data['enabled'] = 0
-        self.widget_data['focusable'] = 0
-        self.widget_data['focused'] = 0
-        self.widget_data['scrollable'] = 0
-        self.widget_data['long-clickable'] = 0
-        self.widget_data['password'] = 0
-        self.widget_data['selected'] = 0
-        self.widget_data['bounds'] = 0
-        self.widget_data['resource-id'] = 0
-        self.widget_data['instance'] = 0
+    def __init__(self, xml):
+        self.xml = xml
+        self.widget_data = []
+        self.tag_name = ['index',       'text',         'class',
+                         'package',     'content-desc', 'checkable',
+                         'checked',     'enabled',      'focusable',
+                         'focused',     'scrollable',   'long-clickable',
+                         'password',    'selected',     'bounds',
+                         'resource-id', 'instance']
 
-    # parse the input xml line and save each data
-    def set_data(self, line):
-        self.parse_data(line)
+        for i in range(0, len(self.tag_name)):
+            self.widget_data.append('')
 
-    def parse_data(self, line):
-        b = 0
+    # Set tag information
+    def set_widget_data(self, tag, value):
+        index = self.widget_data.index(tag)
+        self.widget_data[index] = value
+
+    # Returns tag information
+    def get_widget_data(self, tag):
+        index = self.widget_data.index(tag)
+        return self.widget_data[index]
+
+    # A method that returns what tag an index comes in as input.
+    def what_tag_assigned_this_index(self, index):
+        return self.tag_name[index]
