@@ -154,7 +154,7 @@ class AutoLabeler:
 
         return True
 
-
+# main
 if __name__ == '__main__':
     auto_labeler = AutoLabeler()
     application_name = ''
