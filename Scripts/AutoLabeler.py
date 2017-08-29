@@ -19,6 +19,9 @@ import desired_capabilities
 
 import widget
 import Parser
+import TensorOutput
+import Evaluation
+
 
 class AutoLabeler:
     def __init__(self):
@@ -31,6 +34,7 @@ class AutoLabeler:
         self.desired_caps = desired_capabilities.get_desired_capabilities('')
         self.driver = webdriver.Remote("http://localhost:4723/wd/hub", self.desired_caps)
 
+        self.label_map_dict = ['Unknown', 'Button', 'EditText', 'CheckBox', 'Option', 'Swipe', 'Switch', 'Spinner']
 
     ######################
     # Under Construction #
@@ -41,8 +45,10 @@ class AutoLabeler:
         self.xml_source[file_name+num_of_image] = self.driver.page_source
         self.do_action_use_appium(widget)
 
-        #TODO implement state transition
-
+        # TODO implement state transition
+        # option 1: User initial sequence << efficient and easy to implement
+        # option 2: auto state transition using tensorflow result
+        # option 3: auto state transition using xml source
 
     ###############
     # COMPLETE!!! #
@@ -55,7 +61,6 @@ class AutoLabeler:
             action = TouchAction(self.driver)
             action.tap(el).perform()
 
-
     ######################
     # Under Construction #
     ######################
@@ -64,10 +69,19 @@ class AutoLabeler:
         # TODO Fix Google Object Detection eval Method
         # get box boundary data, class and accuracy
 
-        output = {'box_boundary':[], 'classes':[], 'accuracy':[]}
+        evaluation = Evaluation.Evaluation()
+        tensor_output = evaluation.run()
 
-        return output   # return refined label data
+        for single_box in tensor_output:
+            boundary = single_box['boundaries']
+            identified_class = single_box['classes']
+            accuracy = single_box['accuracy']
 
+            refined = TensorOutput.TensorOutput(boundary, identified_class, accuracy)
+
+            tensor_output.append(refined)
+
+        return tensor_output   # return refined label data
 
     ##############
     # Complete!! #
@@ -76,12 +90,12 @@ class AutoLabeler:
     def refine_result_data(self, output):
         label_list = []
         for i in range(0, len(output)):
-            widget_type = output['class'][i]
+            widget_type = output[i].get_class()
 
-            x_start = output['box_boundary'][i][0]
-            y_start = output['box_boundary'][i][1]
-            x_end = output['box_boundary'][i][2]
-            y_end = output['box_boundary'][i][3]
+            x_start = output[i].get_boundary()[0]
+            y_start = output[i].get_boundary()[1]
+            x_end = output[i].get_boundary()[2]
+            y_end = output[i].get_boundary()[3]
 
             line = widget_type + " 0.0 0 0.0 0 " \
                    + x_start + " " + y_start + " " \
@@ -91,8 +105,6 @@ class AutoLabeler:
 
         return label_list
 
-
-
     ###############
     # COMPLETE!!! #
     ###############
@@ -101,7 +113,6 @@ class AutoLabeler:
         label_file.write(label)
         label_file.close()
         print('file [' + filename + '] generation complete')
-
 
     ######################
     # Under Construction #
@@ -116,7 +127,6 @@ class AutoLabeler:
         for i in range(0, len(output)):
             self.find_boundary_data(output[i], widget_list)
 
-
     ###############
     # COMPLETE!!! #
     #############################################################
@@ -127,29 +137,27 @@ class AutoLabeler:
         widget_list = parsing_data.do_parsing()
 
         boundaries = []
-        for i in range(0, len(widget_list)):
-            boundaries.append(widget_list[i].get_widget_data('boundary'))
+        for single_widget in widget_list:
+            boundaries.append(single_widget.get_widget_data('boundary'))
 
         return boundaries
-
 
     ######################
     # Under Construction #
     #####################################################################
     # Returns True if the label entered as input matches the boundaries #
     # of the widgets in the widget list, otherwise returns False.       #
-    # parm: output <- widget list data
-    #       widget_list <-
+    # parm: widget_data <- widget data from output                      #
+    #       widget_list <- widget list from xml parsing                 #
     #####################################################################
-    def find_boundary_data(self, output, widget_list):
-        label_boundary = output.get_boundary() # must be implemented!!
+    def find_boundary_data(self, widget_data, widget_list):
+        label_boundary = widget_data.get_boundary()  # must be implemented!!
 
-        for i in range(0, len(widget_list)):
-            single_widget = widget_list[i]
+        for single_widget in widget_list:
             boundary = single_widget.get_widget_data('boundary')
 
             for j in range(0, len(boundary)):
-                if boundary[j] - label_boundary[j] > 50 :
+                if boundary[j] - label_boundary[j] > 50:
                     return False
 
         return True
@@ -164,9 +172,11 @@ if __name__ == '__main__':
     label_data = auto_labeler.refine_result_data(result)                        # output <- widget_list data
     auto_labeler.save_label(application_name, label_data)                       # output <- noting
 
-    if auto_labeler.check_result(label_data) :
+    if auto_labeler.check_result(label_data, application_name):
         do = 0
         something = 0
-    else :
+        # save accurate folder
+    else:
         do = 1
         something = 1
+        # save inaccurate folder

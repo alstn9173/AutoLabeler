@@ -1,7 +1,4 @@
-##############
-# COMPLETE!!!#
-##############
-class Widget :
+class Widget:
     def __init__(self, xml):
         self.xml = xml
         self.widget_data = {}

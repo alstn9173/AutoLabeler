@@ -1,8 +1,6 @@
 import widget
 
-######################
-# COMPLETE!!!(maybe) #
-######################
+
 class Parser:
     def __init__(self, xml):
         self.xml = xml          # xml code
@@ -53,9 +51,8 @@ class Parser:
     # [result]  set_of_widgets = [  This = method,
     #                               works = like this ]
     def parser(self):
-        for i in range(0, len(self.lines)):
+        for line in self.lines:
             w = widget.Widget(self.xml)
-            line = self.lines[i]
 
             for j in range(0, len(self.tag_name)):
                 w.set_widget_data(self.tag_name[j],
@@ -71,5 +68,5 @@ class Parser:
     #   -- print_xml --
     # Print the current xml code.
     def print_xml(self):
-        for i in range(0, len(self.lines)):
-            print(self.lines[i])
+        for line in self.lines:
+            print(line)

@@ -1,5 +1,6 @@
 import os
 
+
 def get_desired_capabilities(app):
     desired_caps = {
         'app': os.getcwd() + "/" + app,
