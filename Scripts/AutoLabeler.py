@@ -15,21 +15,19 @@ import os
 
 from appium import webdriver
 from appium.webdriver.common.touch_action import TouchAction
+
+import Evaluation
+import Parser
 import desired_capabilities
 
-import widget
-import Parser
-import TensorOutput
-import Evaluation
-
-
 class AutoLabeler:
-    def __init__(self):
+    def __init__(self, output_file_directory):
         self.THRESHOLD = 0
-        self.input_file_directory = os.getcwd() + '/data/'
-        self.output_file_directory = os.getcwd() + '/result/'
+        #self.input_file_directory = os.getcwd() + '/data/'
+        self.output_file_directory = output_file_directory
 
         self.xml_source = {}
+        self.file_name_list = []
 
         self.desired_caps = desired_capabilities.get_desired_capabilities('')
         self.driver = webdriver.Remote("http://localhost:4723/wd/hub", self.desired_caps)
@@ -41,9 +39,14 @@ class AutoLabeler:
     ######################
     def make_label_from_screen(self, file_name, num_of_image):
         file_path = self.output_file_directory + file_name + '_' + num_of_image
-        self.driver.save_screenshot(file_path + '.jpeg')
-        self.xml_source[file_name+num_of_image] = self.driver.page_source
-        self.do_action_use_appium(widget)
+
+        self.driver.save_screenshot(file_path + '.jpeg')                            # Save current application screen
+        self.xml_source[file_name+num_of_image] = self.driver.page_source           # Save xml source code
+
+        #self.do_action_use_appium(widget)
+
+        self.file_name_list.append(file_name + '_' + num_of_image)
+        num_of_image = num_of_image+1
 
         # TODO implement state transition
         # option 1: User initial sequence << efficient and easy to implement
@@ -51,7 +54,7 @@ class AutoLabeler:
         # option 3: auto state transition using xml source
 
     ###############
-    # COMPLETE!!! #
+    # Complete??? #
     ###############
     def do_action_use_appium(self, input_widget):
         if input_widget == 'BACK':
@@ -61,74 +64,74 @@ class AutoLabeler:
             action = TouchAction(self.driver)
             action.tap(el).perform()
 
-    ######################
-    # Under Construction #
-    ######################
+    ###############
+    # Complete!!! #
+    ###############
     def labeling_from_tensorflow(self, image_path):
-        # run tensorflow test method
-        # TODO Fix Google Object Detection eval Method
-        # get box boundary data, class and accuracy
-
-        evaluation = Evaluation.Evaluation()
+        evaluation = Evaluation.Evaluation(image_path)
         tensor_output = evaluation.run()
-
-        for single_box in tensor_output:
-            boundary = single_box['boundaries']
-            identified_class = single_box['classes']
-            accuracy = single_box['accuracy']
-
-            refined = TensorOutput.TensorOutput(boundary, identified_class, accuracy)
-
-            tensor_output.append(refined)
 
         return tensor_output   # return refined label data
 
-    ##############
-    # Complete!! #
-    ##############
+    ###############
+    # Complete!!! #
+    ###############
     # result: output from the tensorflow
-    def refine_result_data(self, output):
-        label_list = []
-        for i in range(0, len(output)):
-            widget_type = output[i].get_class()
+    def refine_result_data(self, tensor_output):
+        image_list = []
 
-            x_start = output[i].get_boundary()[0]
-            y_start = output[i].get_boundary()[1]
-            x_end = output[i].get_boundary()[2]
-            y_end = output[i].get_boundary()[3]
+        for i in range(0, len(tensor_output)):      # do every images
+            set_of_widget_type = tensor_output[i]['classes']
+            set_of_boundaries = tensor_output[i]['boundaries']
 
-            line = widget_type + " 0.0 0 0.0 0 " \
-                   + x_start + " " + y_start + " " \
-                   + x_end + " " + y_end + " 0.0 0.0 0.0 0.0 0.0 0.0\n"
+            label = ''
+            for j in range(0, len(set_of_widget_type)):
+                line = set_of_widget_type[j] + " 0.0 0 0.0 0 " \
+                       + set_of_boundaries[j][0] + " " + set_of_boundaries[j][1] + " " \
+                       + set_of_boundaries[j][2] + " " + set_of_boundaries[j][3] \
+                       + " 0.0 0.0 0.0 0.0 0.0 0.0\n"
 
-            label_list.append(line)
+                label = label + line
+            image_list.append(label)
 
-        return label_list
+        return image_list
 
     ###############
-    # COMPLETE!!! #
+    # Complete!!! #
     ###############
-    def save_label(self, filename, label):
-        label_file = open(self.output_file_directory + filename, 'w')
-        label_file.write(label)
-        label_file.close()
-        print('file [' + filename + '] generation complete')
+    def save_label(self, filename, image_label_list):
+        for label in image_label_list:
+            label_file = open(self.output_file_directory + filename, 'w')
+            label_file.write(label)
+            label_file.close()
+            print('file [' + filename + '] generation complete')
 
     ######################
     # Under Construction #
-    #####################################################################
-    # parm: output <- output of the refined data (type -> widget_list)  #
-    #       file_name <- file name of the saved image(or label)         #
-    #####################################################################
-    def check_result(self, output, file_name):
-        parser = Parser.Parser(self.xml_source[file_name])
-        widget_list = parser.do_parsing()
+    ###############################################################
+    # parm: output <- tensorflow output                           #
+    #       file_name <- file name of the saved image(or label)   #
+    ###############################################################
+    def check_result(self, output_label):
+        boundary_list = self.get_boundary_from_xml(self.xml_source[output_label['name']])
 
-        for i in range(0, len(output)):
-            self.find_boundary_data(output[i], widget_list)
+        exist_widget_index = []
+        non_exist_widget_index = []
+
+        for label_index in range(0, len(output_label)):          # do one image
+            index = self.find_boundary_data(output_label[label_index], boundary_list)
+
+            if index >= 0:
+                exist_widget_index.append(label_index)
+            else:
+                non_exist_widget_index.append(label_index)
+
+        existence_ratio = float(len(exist_widget_index)) / float(len(exist_widget_index) + len(non_exist_widget_index))
+
+        return exist_widget_index, non_exist_widget_index, existence_ratio
 
     ###############
-    # COMPLETE!!! #
+    # Complete!!! #
     #############################################################
     # parm: xml_source <- extracted xml source code by appium   #
     #############################################################
@@ -142,41 +145,58 @@ class AutoLabeler:
 
         return boundaries
 
-    ######################
-    # Under Construction #
+    ##############
+    # Complete!! #
     #####################################################################
     # Returns True if the label entered as input matches the boundaries #
     # of the widgets in the widget list, otherwise returns False.       #
-    # parm: widget_data <- widget data from output                      #
+    # parm: labeled_data <- widget data from output                     #
     #       widget_list <- widget list from xml parsing                 #
     #####################################################################
-    def find_boundary_data(self, widget_data, widget_list):
-        label_boundary = widget_data.get_boundary()  # must be implemented!!
+    def find_boundary_data(self, labeled_data, widget_list):
+        label_boundary = labeled_data['boundaries']
 
-        for single_widget in widget_list:
+        difference_threshold = 250
+        min_diff = 9999999
+        min_index = 0
+
+        for index in range(0, len(widget_list)):
+            single_widget = widget_list[index]
             boundary = single_widget.get_widget_data('boundary')
 
-            for j in range(0, len(boundary)):
-                if boundary[j] - label_boundary[j] > 50:
-                    return False
+            difference = 0
 
-        return True
+            for j in range(0, len(boundary)):
+                difference = difference + abs(boundary[j] - label_boundary[j])
+
+            if min_diff > difference:
+                min_diff = difference
+                min_index = index
+
+        if min_diff < difference_threshold:
+            return min_index
+        else:
+            return -1
 
 # main
 if __name__ == '__main__':
-    auto_labeler = AutoLabeler()
+    image_path = os.getcwd() + '/test_image/'
     application_name = ''
-    auto_labeler.make_label_from_screen(application_name, 0)
 
-    result = auto_labeler.labeling_from_tensorflow(os.getcwd() + '/result/')    # output <- list(dictionary) data
-    label_data = auto_labeler.refine_result_data(result)                        # output <- widget_list data
-    auto_labeler.save_label(application_name, label_data)                       # output <- noting
+    auto_labeler = AutoLabeler(image_path)
+    auto_labeler.make_label_from_screen(application_name, 0)        # Make image file & xml source list
 
-    if auto_labeler.check_result(label_data, application_name):
-        do = 0
-        something = 0
-        # save accurate folder
-    else:
-        do = 1
-        something = 1
-        # save inaccurate folder
+    result = auto_labeler.labeling_from_tensorflow(image_path)      # output <- list(dictionary) data
+    label_data = auto_labeler.refine_result_data(result)            # output <- widget_list data
+    auto_labeler.save_label(application_name, label_data)
+
+    for i in range(0, len(result)):
+        (exist, non_exist, ratio) = auto_labeler.check_result(result[i])
+
+        if ratio >= 0.5:
+            os.system('mv ' + image_path + result[i]['name'] + ' '
+                      + image_path + 'accurate/' + result[i]['name'])
+        else:
+            os.system('mv ' + image_path + result[i]['name'] + ' '
+                      + image_path + 'inaccurate/' + result[i]['name'])
+

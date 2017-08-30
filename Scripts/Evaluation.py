@@ -5,20 +5,32 @@ import numpy as np
 import tensorflow as tf
 from PIL import Image
 
-sys.path.append("")
-
 from utils import label_map_util
 
+sys.path.append("/home/mllab/models/")
+
+
+##################
+# Data Structure #
+#####################################################
+#   identified_result   -  result   - classes       #
+#                       |    .      - boundaries    #
+#                       |    .      - accuracy      #
+#                       |    .                      #
+#                       -  result   - classes       #
+#                                   - boundaries    #
+#                                   - accuracy      #
+#####################################################
 
 class Evaluation:
-    def __init__(self):
+    def __init__(self, image_path):
         self.PATH_TO_CKPT = './config/output.pb'
         self.PATH_TO_LABELS = './config/ui_label_map.pbtxt'
 
         self.NUM_CLASSES = 38
 
         self.detection_graph = tf.Graph()
-        self.path = './image_file_2'
+        self.path = image_path
         self.label_map_dict = ['Unknown', 'Button', 'EditText', 'CheckBox', 'Option', 'Swipe', 'Switch', 'Spinner']
 
     def load_image_into_numpy_array(self, image):
@@ -59,7 +71,7 @@ class Evaluation:
                         [boxes, scores, classes, num_detections],
                         feed_dict={image_tensor: image_np_expanded})
 
-                    result = {'classes': [], 'boundaries': [], 'accuracy': []}
+                    result = {'name': image_path, 'classes': [], 'boundaries': [], 'accuracy': []}
 
                     for i in range(0, len(boxes)):
                         for j in range(0, len(boxes[i])):
