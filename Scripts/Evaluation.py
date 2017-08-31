@@ -5,9 +5,9 @@ import numpy as np
 import tensorflow as tf
 from PIL import Image
 
-from utils import label_map_util
-
 sys.path.append("/home/mllab/models/")
+
+from utils import label_map_util
 
 
 ##################

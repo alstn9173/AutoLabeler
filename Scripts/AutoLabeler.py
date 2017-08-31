@@ -12,24 +12,25 @@
 #
 
 import os
+import time
 
 from appium import webdriver
 from appium.webdriver.common.touch_action import TouchAction
 
-import Evaluation
+#import Evaluation
 import Parser
 import desired_capabilities
+
 
 class AutoLabeler:
     def __init__(self, output_file_directory):
         self.THRESHOLD = 0
-        #self.input_file_directory = os.getcwd() + '/data/'
         self.output_file_directory = output_file_directory
 
         self.xml_source = {}
         self.file_name_list = []
 
-        self.desired_caps = desired_capabilities.get_desired_capabilities('')
+        self.desired_caps = desired_capabilities.get_desired_capabilities('../ApiDemos-debug.apk')
         self.driver = webdriver.Remote("http://localhost:4723/wd/hub", self.desired_caps)
 
         self.label_map_dict = ['Unknown', 'Button', 'EditText', 'CheckBox', 'Option', 'Swipe', 'Switch', 'Spinner']
@@ -38,20 +39,23 @@ class AutoLabeler:
     # Under Construction #
     ######################
     def make_label_from_screen(self, file_name, num_of_image):
-        file_path = self.output_file_directory + file_name + '_' + num_of_image
+        try:
+            file_path = self.output_file_directory + file_name + '_' + str(num_of_image)
 
-        self.driver.save_screenshot(file_path + '.jpeg')                            # Save current application screen
-        self.xml_source[file_name+num_of_image] = self.driver.page_source           # Save xml source code
+            time.sleep(0.5)
+            self.driver.save_screenshot(file_path)                      # Save current application screen
+            self.xml_source[file_name + '_' + str(num_of_image)] = self.driver.page_source  # Save xml source code
 
-        #self.do_action_use_appium(widget)
+            self.do_action_use_appium('BACK')
 
-        self.file_name_list.append(file_name + '_' + num_of_image)
-        num_of_image = num_of_image+1
+            self.file_name_list.append(file_name + '_' + str(num_of_image))
+            num_of_image = num_of_image+1
 
-        # TODO implement state transition
-        # option 1: User initial sequence << efficient and easy to implement
-        # option 2: auto state transition using tensorflow result
-        # option 3: auto state transition using xml source
+        # self.make_label_from_screen(file_name, num_of_image)
+        except:
+            print ('error occured!')
+        finally:
+            self.driver.quit()
 
     ###############
     # Complete??? #
@@ -60,17 +64,29 @@ class AutoLabeler:
         if input_widget == 'BACK':
             self.driver.press_keycode(4)    # go back
         else:
-            el = self.driver.find_element_by_name(input_widget)
+            x = input_widget
+            y = input_widget
+            # el = self.driver.find_element_by_name(input_widget)
             action = TouchAction(self.driver)
-            action.tap(el).perform()
+            action.tap(None, x, y).perform()
 
-    ###############
-    # Complete!!! #
-    ###############
-    def labeling_from_tensorflow(self, image_path):
-        evaluation = Evaluation.Evaluation(image_path)
-        tensor_output = evaluation.run()
+    ###################
+    # not Complete!!! #
+    ###################
+    # TODO Use Tensorflow object detection!!
+    def labeling_from_tensorflow(self, eval_image_path):
+        #evaluation = Evaluation.Evaluation(eval_image_path)
+        #tensor_output = evaluation.run()
 
+        tensor_output = [{'name': 'sample_0', 'classes': ['Button', 'Spinner', 'Option'],
+                          'boundaries': [[0, 0, 50, 50], [50, 50, 100, 100], [100, 100, 200, 200]],
+                          'accuracy': [0.9, 0.8, 0.5]}]
+                         # {'name': eval_image_path, 'classes': ['Button', 'Button', 'EditText'],
+                         # 'boundaries': [[0, 0, 50, 50], [50, 50, 100, 100], [100, 100, 200, 200]],
+                         # 'accuracy': [0.7, 0.6, 0.05]},
+                         # {'name': eval_image_path, 'classes': ['Option', 'Option', 'Option'],
+                         # 'boundaries': [[0, 0, 50, 50], [50, 50, 100, 100], [100, 100, 200, 200]],
+                         # 'accuracy': [0.56, 0.55, 0.2]}]
         return tensor_output   # return refined label data
 
     ###############
@@ -80,15 +96,15 @@ class AutoLabeler:
     def refine_result_data(self, tensor_output):
         image_list = []
 
-        for i in range(0, len(tensor_output)):      # do every images
-            set_of_widget_type = tensor_output[i]['classes']
-            set_of_boundaries = tensor_output[i]['boundaries']
+        for output_index in range(0, len(tensor_output)):      # do every images
+            set_of_widget_type = tensor_output[output_index]['classes']
+            set_of_boundaries = tensor_output[output_index]['boundaries']
 
             label = ''
             for j in range(0, len(set_of_widget_type)):
                 line = set_of_widget_type[j] + " 0.0 0 0.0 0 " \
-                       + set_of_boundaries[j][0] + " " + set_of_boundaries[j][1] + " " \
-                       + set_of_boundaries[j][2] + " " + set_of_boundaries[j][3] \
+                       + str(set_of_boundaries[j][0]) + " " + str(set_of_boundaries[j][1]) + " " \
+                       + str(set_of_boundaries[j][2]) + " " + str(set_of_boundaries[j][3]) \
                        + " 0.0 0.0 0.0 0.0 0.0 0.0\n"
 
                 label = label + line
@@ -100,14 +116,15 @@ class AutoLabeler:
     # Complete!!! #
     ###############
     def save_label(self, filename, image_label_list):
-        for label in image_label_list:
-            label_file = open(self.output_file_directory + filename, 'w')
-            label_file.write(label)
+
+        for label_index in range(0, len(image_label_list)):
+            label_file = open(self.output_file_directory + filename + '_' + str(label_index) + '.txt', 'w')
+            label_file.write(image_label_list[label_index])
             label_file.close()
             print('file [' + filename + '] generation complete')
 
-    ######################
-    # Under Construction #
+    ###############
+    # Complete!!! #
     ###############################################################
     # parm: output <- tensorflow output                           #
     #       file_name <- file name of the saved image(or label)   #
@@ -119,7 +136,7 @@ class AutoLabeler:
         non_exist_widget_index = []
 
         for label_index in range(0, len(output_label)):          # do one image
-            index = self.find_boundary_data(output_label[label_index], boundary_list)
+            index = self.find_boundary_data(output_label, boundary_list)
 
             if index >= 0:
                 exist_widget_index.append(label_index)
@@ -137,11 +154,11 @@ class AutoLabeler:
     #############################################################
     def get_boundary_from_xml(self, xml_source):
         parsing_data = Parser.Parser(xml_source)
-        widget_list = parsing_data.do_parsing()
+        widget_list = parsing_data.parser()
 
         boundaries = []
         for single_widget in widget_list:
-            boundaries.append(single_widget.get_widget_data('boundary'))
+            boundaries.append(single_widget['bounds'])
 
         return boundaries
 
@@ -160,18 +177,19 @@ class AutoLabeler:
         min_diff = 9999999
         min_index = 0
 
-        for index in range(0, len(widget_list)):
-            single_widget = widget_list[index]
-            boundary = single_widget.get_widget_data('boundary')
+        for label_index in range(0, len(label_boundary)):
+            for widget_index in range(0, len(widget_list)):
+                boundary = widget_list[widget_index]
 
-            difference = 0
+                difference = 0
 
-            for j in range(0, len(boundary)):
-                difference = difference + abs(boundary[j] - label_boundary[j])
+                for j in range(0, len(boundary)):
+                    temp_diff = int(float(boundary[j])) - int(float(label_boundary[label_index][j]))
+                    difference = difference + abs(temp_diff)
 
-            if min_diff > difference:
-                min_diff = difference
-                min_index = index
+                if min_diff > difference:
+                    min_diff = difference
+                    min_index = widget_index
 
         if min_diff < difference_threshold:
             return min_index
@@ -180,8 +198,8 @@ class AutoLabeler:
 
 # main
 if __name__ == '__main__':
-    image_path = os.getcwd() + '/test_image/'
-    application_name = ''
+    image_path = '/home/mllab/test_image/'
+    application_name = 'sample'
 
     auto_labeler = AutoLabeler(image_path)
     auto_labeler.make_label_from_screen(application_name, 0)        # Make image file & xml source list
@@ -195,8 +213,12 @@ if __name__ == '__main__':
 
         if ratio >= 0.5:
             os.system('mv ' + image_path + result[i]['name'] + ' '
-                      + image_path + 'accurate/' + result[i]['name'])
+                      + image_path + 'accurate/')
+            os.system('mv ' + image_path + result[i]['name'] + '.* '
+                      + image_path + 'accurate/')
         else:
             os.system('mv ' + image_path + result[i]['name'] + ' '
-                      + image_path + 'inaccurate/' + result[i]['name'])
+                      + image_path + 'inaccurate/')
+            os.system('mv ' + image_path + result[i]['name'] + '.* '
+                      + image_path + 'inaccurate/')
 
