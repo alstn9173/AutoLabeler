@@ -13,6 +13,7 @@
 
 import os
 import time
+import random
 
 from appium import webdriver
 from appium.webdriver.common.touch_action import TouchAction
@@ -23,49 +24,75 @@ import desired_capabilities
 
 
 class AutoLabeler:
-    def __init__(self, output_file_directory):
+    def __init__(self, app, output_file_directory):
         self.THRESHOLD = 0
         self.output_file_directory = output_file_directory
 
         self.xml_source = {}
         self.file_name_list = []
+        self.sequence_input = []
 
-        self.desired_caps = desired_capabilities.get_desired_capabilities('../ApiDemos-debug.apk')
+        ##
+        self.app = app
+        self.sequence_index = 0
+        ##
+
+        self.desired_caps = desired_capabilities.get_desired_capabilities('../' + app + '.apk')
         self.driver = webdriver.Remote("http://localhost:4723/wd/hub", self.desired_caps)
 
         self.label_map_dict = ['Unknown', 'Button', 'EditText', 'CheckBox', 'Option', 'Swipe', 'Switch', 'Spinner']
 
+    def program_exit(self):
+        self.driver.quit()
+
+    def sequence_reader(self, sequence_file_path):
+        sequence = open(sequence_file_path, 'r')
+
+        while True:
+            line = sequence.readline()
+
+            if not line:
+                break
+
+            coordinates = []
+
+            if len(line) > 1:
+                line = line[0:len(line)-1]
+                coordinates = line.split(' ')
+
+            self.sequence_input.append(coordinates)
+
     ######################
     # Under Construction #
     ######################
-    def make_label_from_screen(self, file_name, num_of_image):
-        try:
-            file_path = self.output_file_directory + file_name + '_' + str(num_of_image)
+    def make_label_from_screen(self, file_name, image_number):
+        file_path = self.output_file_directory + file_name + '_' + str(image_number)
 
-            time.sleep(0.5)
-            self.driver.save_screenshot(file_path)                      # Save current application screen
-            self.xml_source[file_name + '_' + str(num_of_image)] = self.driver.page_source  # Save xml source code
+        time.sleep(0.5)     # screen change delay
+        self.driver.save_screenshot(file_path)                      # Save current application screen
+        self.xml_source[file_name + '_' + str(image_number)] = self.driver.page_source  # Save xml source code
 
-            self.do_action_use_appium('BACK')
+        print ('[log] [make_label_from_screen] screenshot \"' + file_name + '_' + str(image_number) + '\" saved.')
 
-            self.file_name_list.append(file_name + '_' + str(num_of_image))
-            num_of_image = num_of_image+1
+        if self.sequence_index < len(self.sequence_input):
+            self.do_action_use_appium(self.sequence_input[self.sequence_index])
+            self.sequence_index = self.sequence_index + 1
+            self.make_label_from_screen(file_name, image_number+1)
 
-        # self.make_label_from_screen(file_name, num_of_image)
-        except:
-            print ('error occured!')
-        finally:
-            self.driver.quit()
+        self.file_name_list.append(file_name + '_' + str(image_number))
+        self.do_action_use_appium([])
+        time.sleep(0.5)     # return delay
 
     ###############
     # Complete??? #
     ###############
-    def do_action_use_appium(self, input_widget):
-        if input_widget == 'BACK':
+    def do_action_use_appium(self, input_coordinate):
+        if not input_coordinate:
             self.driver.press_keycode(4)    # go back
         else:
-            x = input_widget
-            y = input_widget
+            print ('[log] [do_action_use_appium] Touched!! ' + str(input_coordinate))
+            x = input_coordinate[0]
+            y = input_coordinate[1]
             # el = self.driver.find_element_by_name(input_widget)
             action = TouchAction(self.driver)
             action.tap(None, x, y).perform()
@@ -78,15 +105,20 @@ class AutoLabeler:
         #evaluation = Evaluation.Evaluation(eval_image_path)
         #tensor_output = evaluation.run()
 
-        tensor_output = [{'name': 'sample_0', 'classes': ['Button', 'Spinner', 'Option'],
-                          'boundaries': [[0, 0, 50, 50], [50, 50, 100, 100], [100, 100, 200, 200]],
-                          'accuracy': [0.9, 0.8, 0.5]}]
-                         # {'name': eval_image_path, 'classes': ['Button', 'Button', 'EditText'],
-                         # 'boundaries': [[0, 0, 50, 50], [50, 50, 100, 100], [100, 100, 200, 200]],
-                         # 'accuracy': [0.7, 0.6, 0.05]},
-                         # {'name': eval_image_path, 'classes': ['Option', 'Option', 'Option'],
-                         # 'boundaries': [[0, 0, 50, 50], [50, 50, 100, 100], [100, 100, 200, 200]],
-                         # 'accuracy': [0.56, 0.55, 0.2]}]
+        tensor_output = []
+
+        for label_index in range(0, len(self.sequence_input)):
+            tensor_output.append({'name': self.app + '_' + str(label_index),
+                                  'classes': [self.label_map_dict[random.randrange(0, 6)],
+                                              self.label_map_dict[random.randrange(0, 6)],
+                                              self.label_map_dict[random.randrange(0, 6)]],
+                                  'boundaries': [[random.randrange(0, 540), random.randrange(540, 1080),
+                                                  random.randrange(0, 960), random.randrange(960, 1920)],
+                                                 [random.randrange(0, 540), random.randrange(540, 1080),
+                                                  random.randrange(0, 960), random.randrange(960, 1920)],
+                                                 [random.randrange(0, 540), random.randrange(540, 1080),
+                                                  random.randrange(0, 960), random.randrange(960, 1920)]],
+                                  'accuracy': [random.random(), random.random(), random.random()]})
         return tensor_output   # return refined label data
 
     ###############
@@ -121,7 +153,7 @@ class AutoLabeler:
             label_file = open(self.output_file_directory + filename + '_' + str(label_index) + '.txt', 'w')
             label_file.write(image_label_list[label_index])
             label_file.close()
-            print('file [' + filename + '] generation complete')
+            print('[log] [save_label] file [' + filename + '] generation complete')
 
     ###############
     # Complete!!! #
@@ -199,9 +231,10 @@ class AutoLabeler:
 # main
 if __name__ == '__main__':
     image_path = '/home/mllab/test_image/'
-    application_name = 'sample'
+    application_name = 'ApiDemos-debug'
 
-    auto_labeler = AutoLabeler(image_path)
+    auto_labeler = AutoLabeler(application_name, image_path)
+    auto_labeler.sequence_reader('../Sequence/Sequence_data.txt')
     auto_labeler.make_label_from_screen(application_name, 0)        # Make image file & xml source list
 
     result = auto_labeler.labeling_from_tensorflow(image_path)      # output <- list(dictionary) data
@@ -221,4 +254,6 @@ if __name__ == '__main__':
                       + image_path + 'inaccurate/')
             os.system('mv ' + image_path + result[i]['name'] + '.* '
                       + image_path + 'inaccurate/')
+
+    auto_labeler.program_exit()
 
