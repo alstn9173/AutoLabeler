@@ -45,6 +45,12 @@ class AutoLabeler:
     def program_exit(self):
         self.driver.quit()
 
+    ######################
+    # Under Construction #
+    #####################################################
+    # [input] sequence_file_path: Sequence data path    #
+    # [output] sequence_command                         #
+    #####################################################
     def sequence_reader(self, sequence_file_path):
         sequence = open(sequence_file_path, 'r')
 
@@ -102,8 +108,8 @@ class AutoLabeler:
     ###################
     # TODO Use Tensorflow object detection!!
     def labeling_from_tensorflow(self, eval_image_path):
-        #evaluation = Evaluation.Evaluation(eval_image_path)
-        #tensor_output = evaluation.run()
+        # evaluation = Evaluation.Evaluation(eval_image_path)
+        # tensor_output = evaluation.run()
 
         tensor_output = []
 
