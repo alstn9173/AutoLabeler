@@ -74,20 +74,33 @@ class AutoLabeler:
     def make_label_from_screen(self, file_name, image_number):
         file_path = self.output_file_directory + file_name + '_' + str(image_number)
 
-        time.sleep(0.5)     # screen change delay
-        self.driver.save_screenshot(file_path)                      # Save current application screen
-        self.xml_source[file_name + '_' + str(image_number)] = self.driver.page_source  # Save xml source code
+        temp_xml = self.driver.page_source
+        parsing_data = Parser.Parser(temp_xml)
+        widget_list = parsing_data.parser()
 
-        print ('[log] [make_label_from_screen] screenshot \"' + file_name + '_' + str(image_number) + '\" saved.')
+        similarity = 0
+        for file_number in range(0, len(self.xml_source)):
+            percentage = self.screen_compare(widget_list, self.xml_source[file_name + '_' + str(file_number)])
 
-        if self.sequence_index < len(self.sequence_input):
-            self.do_action_use_appium(self.sequence_input[self.sequence_index])
-            self.sequence_index = self.sequence_index + 1
-            self.make_label_from_screen(file_name, image_number+1)
+            if similarity < percentage:
+                similarity = percentage
 
-        self.file_name_list.append(file_name + '_' + str(image_number))
-        self.do_action_use_appium([])
-        time.sleep(0.5)     # return delay
+        if similarity < 0.5:
+            time.sleep(0.5)     # screen change delay
+            self.driver.save_screenshot(file_path)                      # Save current application screen
+            self.xml_source[file_name + '_' + str(image_number)] = widget_list     # Save xml source code
+
+            print ('[log] [make_label_from_screen] screenshot \"' + file_name + '_' + str(image_number) + '\" saved.')
+
+            # TODO If the input sequence is the Back button, the program should not save the screenshot.
+            if self.sequence_index < len(self.sequence_input):
+                self.do_action_use_appium(self.sequence_input[self.sequence_index])
+                self.sequence_index = self.sequence_index + 1
+                self.make_label_from_screen(file_name, image_number+1)
+
+            self.file_name_list.append(file_name + '_' + str(image_number))
+            self.do_action_use_appium([])
+            time.sleep(0.5)     # return delay
 
     ###############
     # Complete??? #
@@ -102,6 +115,29 @@ class AutoLabeler:
             # el = self.driver.find_element_by_name(input_widget)
             action = TouchAction(self.driver)
             action.tap(None, x, y).perform()
+
+    ######################
+    # Under Construction #
+    #############################
+    #                           #
+    #############################
+    def screen_compare(self, input_source, target_source):
+        counter = 0
+        tag_name = ['index', 'text', 'class', 'package',
+                    'content-desc', 'checkable', 'checked',
+                    'clickable', 'enabled', 'focusable',
+                    'focused', 'scrollable', 'long-clickable',
+                    'password', 'selected', 'bounds',
+                    'resource-id', 'instance']
+        for widget in input_source:
+            for target_widget in target_source:
+                equal = True
+
+
+
+            counter = counter + 1
+
+        return something
 
     ###################
     # not Complete!!! #
@@ -168,7 +204,7 @@ class AutoLabeler:
     #       file_name <- file name of the saved image(or label)   #
     ###############################################################
     def check_result(self, output_label):
-        boundary_list = self.get_boundary_from_xml(self.xml_source[output_label['name']])
+        boundary_list = self.get_boundary_from_xml(output_label['name'])
 
         exist_widget_index = []
         non_exist_widget_index = []
@@ -187,12 +223,11 @@ class AutoLabeler:
 
     ###############
     # Complete!!! #
-    #############################################################
-    # parm: xml_source <- extracted xml source code by appium   #
-    #############################################################
-    def get_boundary_from_xml(self, xml_source):
-        parsing_data = Parser.Parser(xml_source)
-        widget_list = parsing_data.parser()
+    ###########################
+    # parm: name <- file name #
+    ###########################
+    def get_boundary_from_xml(self, name):
+        widget_list = self.xml_source[name]
 
         boundaries = []
         for single_widget in widget_list:
@@ -234,6 +269,8 @@ class AutoLabeler:
         else:
             return -1
 
+
+
 # main
 if __name__ == '__main__':
     image_path = '/home/mllab/test_image/'
@@ -262,4 +299,3 @@ if __name__ == '__main__':
                       + image_path + 'inaccurate/')
 
     auto_labeler.program_exit()
-
